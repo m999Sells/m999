@@ -6,7 +6,7 @@
     <title>M999</title>
     <script type="module">
         import products from './product_data.js';
-        
+
         function displayProducts(filteredProducts) {
             const container = document.getElementById("product-list");
             container.innerHTML = "";
@@ -17,7 +17,9 @@
                     <img src="${product.img}" alt="${product.name}">
                     <div class="product-name">${product.name}</div>
                 `;
-                productDiv.onclick = () => alert(JSON.stringify(product.sizes, null, 2));
+                productDiv.onclick = () => {
+                    openModal(product);
+                };
                 container.appendChild(productDiv);
             });
         }
@@ -40,6 +42,96 @@
             displayProducts(filteredProducts);
         }
 
+        function openModal(product) {
+            const modal = document.getElementById("modal");
+            const requestButton = document.getElementById("request-btn");
+            const whatsappInput = document.getElementById("whatsapp");
+            const emailInput = document.getElementById("email");
+            const phoneInput = document.getElementById("phone");
+            const sizeSelect = document.getElementById("size-select");
+            const quantityInput = document.getElementById("quantity");
+            const qcSelect = document.getElementById("qc-select");
+            const noteInput = document.getElementById("note");
+            const confirmationMessage = document.getElementById("confirmation-message");
+            const contactMethodSelect = document.getElementById("contact-method");
+            const contactInput = document.getElementById("contact-input");
+
+            // Set the default size options based on the product's available sizes
+            sizeSelect.innerHTML = "";
+            Object.keys(product.sizes).forEach(size => {
+                const option = document.createElement("option");
+                option.value = size;
+                option.textContent = size;
+                sizeSelect.appendChild(option);
+            });
+
+            // Set QC dropdown options
+            qcSelect.innerHTML = `
+                <option value="None">None</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+            `;
+            
+            // Show the modal
+            modal.style.display = "flex";
+
+            // Hide confirmation message initially
+            confirmationMessage.style.display = "none";
+
+            // Set button text and show QC dropdown based on availability
+            if (product.available) {
+                requestButton.textContent = "Purchase";
+                qcSelect.style.display = "block"; // Show QC selection if the product is in stock
+            } else {
+                requestButton.textContent = "Request";
+                qcSelect.style.display = "none"; // Hide QC selection if the product is out of stock
+            }
+
+            requestButton.onclick = () => {
+                const selectedSize = sizeSelect.value;
+                const quantity = quantityInput.value;
+                const qcValue = qcSelect.value;
+                const note = noteInput.value;
+                const contactMethod = contactMethodSelect.value;
+                const contactValue = contactInput.value;
+
+                // Send the webhook to Discord
+                fetch('https://discord.com/api/webhooks/1357803022759100587/8KMWVOgp002MAUOgvoxAbVmjopw5UqJSZKzRx4Ymp6yjmspJF-9GsNoZIjvlfUtgne3i', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: `📦 **${product.name}** ${product.available ? 'Purchase' : 'Request'}\nCategory: ${product.category}\nSize: ${selectedSize}\nQuantity: ${quantity}\nQC: ${qcValue}\nNote: ${note}\nContact Method: ${contactMethod}\nContact Info: ${contactValue}\nAvailable: ${product.available ? 'Yes' : 'No'}`
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Show confirmation message
+                        confirmationMessage.style.display = "block";
+                        setTimeout(() => {
+                            modal.style.display = "none"; // Close modal after 3 seconds
+                        }, 2000);
+                    } else {
+                        console.log("Error sending webhook");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                });
+            };
+
+            // Update the contact input based on the selected contact method
+            contactMethodSelect.onchange = () => {
+                const method = contactMethodSelect.value;
+                contactInput.placeholder = method === 'whatsapp' ? 'Enter WhatsApp number' :
+                                           method === 'email' ? 'Enter email address' :
+                                           'Enter phone number';
+            };
+        }
+
         window.addEventListener("DOMContentLoaded", () => {
             displayProducts(products);
             document.getElementById("search").addEventListener("input", filterProducts);
@@ -47,13 +139,40 @@
             document.getElementById("size").addEventListener("change", filterProducts);
             document.getElementById("category").addEventListener("change", filterProducts);
         });
+
+        // Close modal when clicking outside of it
+        window.onclick = (event) => {
+            const modal = document.getElementById("modal");
+            if (event.target === modal) {
+                modal.style.display = "none";
+            }
+        };
     </script>
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #222;
             color: white;
-            text-align: center;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        h1 {
+            margin: 20px 0;
+        }
+        .filters {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .filters select, .filters input {
+            padding: 8px;
+            font-size: 14px;
+            background-color: #333;
+            border: 1px solid #444;
+            color: white;
+            border-radius: 4px;
         }
         .product-container {
             display: grid;
@@ -68,12 +187,12 @@
             height: 250px;
             overflow: hidden;
             margin: auto;
+            border-radius: 8px;
         }
         .product img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            border-radius: 8px;
         }
         .product-name {
             position: absolute;
@@ -82,9 +201,64 @@
             width: 100%;
             background: rgba(0, 0, 0, 0.7);
             padding: 5px;
+            text-align: center;
         }
-        .filters {
-            margin: 20px;
+
+        /* Modal Styles */
+        #modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+        #modal-content {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            color: white;
+            width: 90%;
+            box-sizing: border-box;
+            text-align: left;
+        }
+        .modal-input, .modal-select {
+            margin: 10px 0;
+            padding: 10px;
+            width: 100%;
+            background-color: #444;
+            border: 1px solid #666;
+            border-radius: 4px;
+            color: white;
+        }
+        .modal-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        #confirmation-message {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+
+        /* Dropdown display handling */
+        #qc-select {
+            display: none;
         }
     </style>
 </head>
@@ -102,18 +276,45 @@
             <option value="S">S</option>
             <option value="M">M</option>
             <option value="L">L</option>
-            <option value="XL">XL</option>
-            <option value="10">10</option>
-            <option value="11">11</option>
         </select>
         <select id="category">
             <option value="all">Category</option>
-            <option value="shoes">Shoes</option>
-            <option value="apparel">Apparel</option>
-            <option value="collectables">Collectables</option>
+            <option value="category1">Category 1</option>
+            <option value="category2">Category 2</option>
         </select>
     </div>
-    <div class="product-container" id="product-list">
+    <div id="product-list" class="product-container"></div>
+
+    <!-- Modal -->
+    <div id="modal">
+        <div id="modal-content">
+            <h2>Request Product</h2>
+            <label for="size-select">Size</label>
+            <select id="size-select" class="modal-select"></select>
+
+            <label for="quantity">Quantity</label>
+            <input type="number" id="quantity" min="1" value="1" class="modal-input">
+
+            <label for="qc-select">QC</label>
+            <select id="qc-select" class="modal-select"></select>
+
+            <label for="note">Note</label>
+            <textarea id="note" rows="4" class="modal-input" placeholder="Additional note..."></textarea>
+
+            <label for="contact-method">Contact Method</label>
+            <select id="contact-method" class="modal-select">
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">Email</option>
+                <option value="phone">Phone</option>
+            </select>
+
+            <label for="contact-input">Contact Info</label>
+            <input type="text" id="contact-input" class="modal-input" placeholder="Enter contact info">
+
+            <button id="request-btn" class="modal-button">Request</button>
+
+            <div id="confirmation-message">Your request has been sent!</div>
+        </div>
     </div>
 </body>
 </html>
